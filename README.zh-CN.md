@@ -8,8 +8,9 @@
 
 [![在线演示](https://img.shields.io/badge/在线演示-打开-2f7d5a?style=for-the-badge)](https://shentonyan.github.io/reverse-engineer-a-paper/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
+[![检查](https://github.com/shentonyan/reverse-engineer-a-paper/actions/workflows/check.yml/badge.svg)](https://github.com/shentonyan/reverse-engineer-a-paper/actions/workflows/check.yml)
 ![无需构建](https://img.shields.io/badge/构建-无需-lightgrey?style=for-the-badge)
-![HTML · CSS · JS](https://img.shields.io/badge/HTML%20·%20CSS%20·%20JS-单文件-f2b45e?style=for-the-badge)
+![HTML · CSS · JS](https://img.shields.io/badge/HTML%20·%20CSS%20·%20JS-原生-f2b45e?style=for-the-badge)
 
 </div>
 
@@ -24,10 +25,12 @@
 ## 目录
 
 - [页面里能做什么](#页面里能做什么)
-- [六个场景](#六个场景)
+- [场景一览](#场景一览)
 - [本地运行](#本地运行)
 - [用 GitHub Pages 上线](#用-github-pages-上线)
 - [改成你自己的](#改成你自己的)
+- [测试](#测试)
+- [复用封面](#复用封面)
 - [仓库结构](#仓库结构)
 - [来源与致谢](#来源与致谢)
 - [许可证](#许可证)
@@ -36,7 +39,7 @@
 
 | | |
 |---|---|
-| **滚动** | 一块固定的画布上有六个场景，方块从一种排列飞向下一种。 |
+| **滚动** | 一块固定的画布上有七个场景，方块从一种排列飞向下一种。右侧的圆点可直接跳到任一场景。 |
 | **练习一** | 为一段虚构引言里的每句话选功能（背景、问题、研究空白、目的、价值、文章结构），再检查答案。 |
 | **练习二** | 把动词在过去时、现在时和情态动词之间切换，看同一个论断读起来有什么不同。 |
 | **练习三** | 为自己的草稿勾选八个问题的清单，勾选状态保存在浏览器本地。 |
@@ -53,10 +56,11 @@
 </tr>
 </table>
 
-## 六个场景
+## 场景一览
 
 | # | 场景 | 方块展示的内容 |
 |---|---|---|
+| 0 | 开场 | 方块散落在整个页面。 |
 | 1 | 论文由句子构成 | 铺满整张纸的方块，一个方块一句话（示意，非真实数据）。 |
 | 2 | 每个部分各有职责 | 按引言、方法、结果、讨论、结论分色。 |
 | 3 | 拿一篇引言放大看 | 虚构引言里的六句话，各自标出功能。 |
@@ -66,7 +70,7 @@
 
 ## 本地运行
 
-无需构建，也没有依赖。用浏览器直接打开 `index.html`，或者起一个本地服务：
+无需构建，运行时也没有依赖。用浏览器直接打开 `index.html`，或者起一个本地服务：
 
 ```bash
 python -m http.server 8000
@@ -84,22 +88,54 @@ python -m http.server 8000
 
 ## 改成你自己的
 
-所有内容都在 `index.html` 里。
-
-- **文字与翻译**：元素的英文是它本身的内容，中文放在 `data-zh` 属性里。练习的数据（`SENT`、`TENSES`、`CHECK`）和画布上的标注（`CAP`、`HG`、`LOOP`）是脚本开头附近的普通数组。
-- **颜色**：页面配色是 `:root` 上的一组 CSS 变量（深色值在其后）。方块的颜色在脚本里的 `PAL` 对象中。
-- **形状**：每个场景都在 `build()` 函数里生成。一个场景就是一组方块的目标位置、大小和颜色，新增排列只需新增一段。
+- **文字与翻译**：`assets/content.js`。每一项都是 `{ en, zh }`，包括练习的句子、时态例子、清单和画布上的标注。
+- **页面文案**：在 `index.html` 里，英文是元素本身的内容，中文放在 `data-zh` 属性里。
+- **颜色**：`assets/style.css` 顶部的一组 CSS 变量（深色值在其后）。方块的颜色在 `assets/app.js` 的 `PAL` 对象中。
+- **形状**：每个场景都在 `assets/app.js` 的 `build()` 里生成。一个场景就是一组方块的目标位置、大小和颜色，新增排列只需新增一段。见 [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-scene)。
 - **滚动长度**：固定画布的外层是 `.tall`，高度由场景数量决定。
+
+## 测试
+
+```bash
+npm install
+npx playwright install chromium
+npm test
+```
+
+冒烟测试会在真实浏览器里打开页面，检查 26 项：脚本无报错、七个场景都能到达、画布确实画出了内容、桌面 / 手机 / 竖屏平板都没有横向溢出、练习能正确打分、语言切换和勾选在刷新后保留、深色主题正常。每次推送时 GitHub Actions 都会运行它。
+
+## 复用封面
+
+本页顶部的封面由一个小脚本 `scripts/make-cover.py` 生成（只用 Python 标准库）。它把水彩质感的方块画在方格纸上，输出一张 SVG，新项目一条命令就能得到风格一致的封面：
+
+```bash
+python scripts/make-cover.py --title "我的项目" --subtitle "一句话介绍" \
+    --shape ring --out docs/img/banner.svg
+python scripts/make-cover.py --title "我的项目" --shape pyramid \
+    --size 1200x630 --out docs/img/social-card.svg   # 链接预览图
+```
+
+形状可选 `hourglass`、`ring`、`pyramid`、`scatter`，其余参数见 `--help`。
 
 ## 仓库结构
 
 ```
 .
-├── index.html          整个页面（HTML、CSS、JS 在同一个文件里）
-├── docs/img/           README 里用到的横幅和截图
-├── README.md           英文说明
-├── README.zh-CN.md     本文件
-└── LICENSE             MIT
+├── index.html              页面结构和元信息
+├── assets/
+│   ├── style.css           配色、布局、响应式规则
+│   ├── content.js          全部文字和练习数据（中 / 英）
+│   ├── app.js              画布引擎、场景、练习
+│   └── favicon.svg
+├── tests/                  静态服务器和 Playwright 冒烟测试
+├── scripts/make-cover.py   封面 / 分享图生成脚本
+├── docs/img/               横幅、分享图、截图
+├── .github/workflows/      CI（运行 npm test）
+├── CONTRIBUTING.md
+├── CHANGELOG.md
+├── README.md               英文说明
+├── README.zh-CN.md         本文件
+└── LICENSE                 MIT
 ```
 
 ## 来源与致谢

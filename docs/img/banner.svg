@@ -137,5 +137,11 @@
 <polygon points="951.5,337.0 962.4,338.0 974.1,336.8 972.7,347.5 974.1,360.3 961.5,358.6 950.6,360.7 950.5,348.7" fill="url(#gamber)" stroke="#000" stroke-opacity=".18" stroke-width="1"/>
 <polygon points="977.4,336.7 987.9,337.1 998.8,337.4 997.7,349.5 998.5,360.7 987.7,360.6 976.9,358.4 975.3,349.7" fill="url(#gamber)" stroke="#000" stroke-opacity=".18" stroke-width="1"/>
 <polygon points="1001.9,338.2 1013.3,337.2 1024.0,337.9 1022.4,348.6 1024.5,359.6 1013.2,358.5 1001.3,359.5 1001.6,349.3" fill="url(#gamber)" stroke="#000" stroke-opacity=".18" stroke-width="1"/>
-<g font-family="Georgia, 'Times New Roman', serif" fill="#1d1c19"><text x="70" y="165" font-size="54">Reverse-Engineer</text><text x="70" y="226" font-size="54">a Paper</text></g>
-<g font-family="Helvetica, Arial, sans-serif" fill="#77736a" font-size="18"><text x="72" y="276">A scroll-driven explainer on writing science papers</text><text x="72" y="304">EN / 中文 · three small exercises · no build step</text></g></svg>
+<g font-family="Georgia, 'Times New Roman', serif" fill="#1d1c19">
+<text x="70" y="140" font-size="54">Reverse-Engineer</text>
+<text x="70" y="201" font-size="54">a Paper</text>
+</g>
+<g font-family="Helvetica, Arial, sans-serif" fill="#6a665d" font-size="18">
+<text x="72" y="253">A scroll-driven explainer on writing science papers</text>
+<text x="72" y="281">EN / 中文 · three small exercises · no build step</text>
+</g></svg>

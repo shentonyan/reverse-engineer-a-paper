@@ -8,8 +8,9 @@
 
 [![Live demo](https://img.shields.io/badge/live%20demo-open-2f7d5a?style=for-the-badge)](https://shentonyan.github.io/reverse-engineer-a-paper/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
+[![Checks](https://github.com/shentonyan/reverse-engineer-a-paper/actions/workflows/check.yml/badge.svg)](https://github.com/shentonyan/reverse-engineer-a-paper/actions/workflows/check.yml)
 ![No build step](https://img.shields.io/badge/build-none-lightgrey?style=for-the-badge)
-![HTML · CSS · JS](https://img.shields.io/badge/HTML%20·%20CSS%20·%20JS-single%20file-f2b45e?style=for-the-badge)
+![HTML · CSS · JS](https://img.shields.io/badge/HTML%20·%20CSS%20·%20JS-vanilla-f2b45e?style=for-the-badge)
 
 </div>
 
@@ -24,10 +25,12 @@ The page is bilingual (English / 中文), follows your light or dark system them
 ## Contents
 
 - [What you can do on the page](#what-you-can-do-on-the-page)
-- [The six scenes](#the-six-scenes)
+- [The scenes](#the-scenes)
 - [Run it](#run-it)
 - [Put it online with GitHub Pages](#put-it-online-with-github-pages)
 - [Make it yours](#make-it-yours)
+- [Tests](#tests)
+- [Reuse the cover](#reuse-the-cover)
 - [Repository layout](#repository-layout)
 - [Sources and credits](#sources-and-credits)
 - [License](#license)
@@ -36,7 +39,7 @@ The page is bilingual (English / 中文), follows your light or dark system them
 
 | | |
 |---|---|
-| **Scroll** | Six scenes on one sticky canvas. Squares fly from one arrangement to the next. |
+| **Scroll** | Seven scenes on one sticky canvas. Squares fly from one arrangement to the next. A dot rail on the right jumps to any scene. |
 | **Exercise 1** | Pick the job of each sentence in an invented introduction (background, problem, gap, aim, value, roadmap), then check your answers. |
 | **Exercise 2** | Switch a verb between past, present and modal and see how the same claim reads. |
 | **Exercise 3** | Tick an eight-question checklist for your own draft. Ticks are kept in the browser's local storage. |
@@ -53,10 +56,11 @@ The page is bilingual (English / 中文), follows your light or dark system them
 </tr>
 </table>
 
-## The six scenes
+## The scenes
 
 | # | Scene | What the squares show |
 |---|---|---|
+| 0 | Opening | Squares scattered across the page. |
 | 1 | A paper is made of sentences | A full sheet of squares, one per sentence (illustration, not real data). |
 | 2 | Each part has a job | Colours by section: introduction, methods, results, discussion, conclusion. |
 | 3 | Zoom in on one introduction | Six sentences from an invented introduction, each labelled with its job. |
@@ -66,7 +70,7 @@ The page is bilingual (English / 中文), follows your light or dark system them
 
 ## Run it
 
-There is no build step and no dependency. Open `index.html` in a browser, or serve the folder:
+There is no build step and no runtime dependency. Open `index.html` in a browser, or serve the folder:
 
 ```bash
 python -m http.server 8000
@@ -84,22 +88,54 @@ The page loads two fonts (Newsreader and Hanken Grotesk) from Google Fonts. With
 
 ## Make it yours
 
-Everything lives in `index.html`.
-
-- **Text and translations**: elements carry their Chinese text in a `data-zh` attribute; the English text is the element's own content. The exercise data (`SENT`, `TENSES`, `CHECK`) and the canvas captions (`CAP`, `HG`, `LOOP`) are plain arrays near the top of the script.
-- **Colours**: the page palette is a set of CSS variables on `:root` (with dark values below). The square colours are in the `PAL` object in the script.
-- **Shapes**: each scene is built in the `build()` function. A scene is a list of target positions, sizes and colours for the squares, so a new arrangement is a new block there.
+- **Text and translations**: `assets/content.js`. Every item is `{ en, zh }`: exercise sentences, tense examples, the checklist and the canvas captions.
+- **Page copy**: in `index.html`, the English is the element's own content and the Chinese is in its `data-zh` attribute.
+- **Colours**: CSS variables at the top of `assets/style.css` (dark values follow). The square colours are in the `PAL` object in `assets/app.js`.
+- **Shapes**: each scene is built in `build()` in `assets/app.js`. A scene is a list of target positions, sizes and colours, so a new arrangement is a new block there. See [CONTRIBUTING.md](CONTRIBUTING.md#adding-a-scene).
 - **Scroll length**: the sticky area is `.tall`; its height is set by the scene count.
+
+## Tests
+
+```bash
+npm install
+npx playwright install chromium
+npm test
+```
+
+The smoke test opens the page in a real browser and checks 26 things: no script errors, all seven scenes reachable, the canvas actually painted, no horizontal overflow on desktop, phone and portrait tablet, the exercises scoring correctly, the language toggle and saved ticks surviving a reload, and the dark theme. GitHub Actions runs it on every push.
+
+## Reuse the cover
+
+The banner at the top of this README comes from a small generator, `scripts/make-cover.py` (Python standard library only). It draws watercolour-style squares on graph paper as one SVG, so a new project can get a matching cover in one command:
+
+```bash
+python scripts/make-cover.py --title "My Project" --subtitle "One line about it" \
+    --shape ring --out docs/img/banner.svg
+python scripts/make-cover.py --title "My Project" --shape pyramid \
+    --size 1200x630 --out docs/img/social-card.svg   # for link previews
+```
+
+Shapes: `hourglass`, `ring`, `pyramid`, `scatter`. Run with `--help` for the rest.
 
 ## Repository layout
 
 ```
 .
-├── index.html          the whole page (HTML, CSS and JS in one file)
-├── docs/img/           banner and screenshots used in this README
-├── README.md           this file
-├── README.zh-CN.md     中文说明
-└── LICENSE             MIT
+├── index.html              page structure and metadata
+├── assets/
+│   ├── style.css           tokens, layout, responsive rules
+│   ├── content.js          all text and exercise data (en / zh)
+│   ├── app.js              canvas engine, scenes, exercises
+│   └── favicon.svg
+├── tests/                  static server and Playwright smoke test
+├── scripts/make-cover.py   README banner / social card generator
+├── docs/img/               banner, social card, screenshots
+├── .github/workflows/      CI (runs npm test)
+├── CONTRIBUTING.md
+├── CHANGELOG.md
+├── README.md               this file
+├── README.zh-CN.md         中文说明
+└── LICENSE                 MIT
 ```
 
 ## Sources and credits
