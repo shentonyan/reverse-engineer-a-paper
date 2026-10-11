@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A scroll-driven, bilingual (EN/中文) explainer of the reverse-engineering approach to writing science papers, with three small exercises.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='11' height='11' fill='%2382b2e6'/%3E%3Crect x='18' y='3' width='11' height='11' fill='%23ac9fe4'/%3E%3Crect x='3' y='18' width='11' height='11' fill='%23f2b45e'/%3E%3Crect x='18' y='18' width='11' height='11' fill='%2355a883'/%3E%3C/svg%3E">
+<style>:root{color-scheme:light}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Reverse-Engineer a Paper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Hanken+Grotesk:wght@400;500;600&display=swap">
+<style>
+/* Concept: one full-bleed sheet of graph paper where watercolour squares (each = one sentence) fly between shapes as you scroll. Small cream cards carry the words. */
+:root{
+  --paper:#f9f7f1; --card:#fbf9f4; --cardline:#dcd6c6; --ink:#1d1c19; --mute:#77736a; --line:#e2ddcf;
+  --bar:#d7d2bf; --ok:#2f7d5a; --bad:#b4443a; --accent:#1d1c19;
+  --c-sky:#82b2e6; --c-violet:#ac9fe4; --c-amber:#f2b45e; --c-coral:#ee928a; --c-teal:#52b09c; --c-oat:#dcd5c2; --c-green:#55a883;
+  --serif:"Newsreader","Songti SC","Noto Serif SC","SimSun",Georgia,serif;
+  --sans:"Hanken Grotesk","PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+  --hdr:52px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#14130f; --card:#1d1c17; --cardline:#35322a; --ink:#ece8dc; --mute:#9a958a; --line:#2a2821;
+  --bar:#4a463a; --ok:#6fcf9f; --bad:#ff8f84; --accent:#ece8dc;
+  --c-sky:#5b8fcf; --c-violet:#8979cf; --c-amber:#d89b3f; --c-coral:#d4706a; --c-teal:#3c9784; --c-oat:#4b473c; --c-green:#3b8c6a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#14130f; --card:#1d1c17; --cardline:#35322a; --ink:#ece8dc; --mute:#9a958a; --line:#2a2821;
+  --bar:#4a463a; --ok:#6fcf9f; --bad:#ff8f84; --accent:#ece8dc;
+  --c-sky:#5b8fcf; --c-violet:#8979cf; --c-amber:#d89b3f; --c-coral:#d4706a; --c-teal:#3c9784; --c-oat:#4b473c; --c-green:#3b8c6a; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font:400 17px/1.65 var(--serif)}
+p{margin:0}
+button,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.ui{font-family:var(--sans)}
+
+/* header */
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;height:var(--hdr);background:var(--paper)}
+header .in{height:100%;padding-inline:clamp(16px,3vw,36px);display:flex;align-items:center;justify-content:space-between;gap:12px;font-family:var(--sans)}
+.brand{font:500 .95rem var(--sans);letter-spacing:.01em}
+.right{display:flex;gap:10px;align-items:center}
+.pill{border:1px solid var(--cardline);background:var(--card);border-radius:6px;padding:6px 12px;font:500 .8rem var(--sans);cursor:pointer;white-space:nowrap}
+.lang{display:flex;border:1px solid var(--cardline);border-radius:6px;overflow:hidden;background:var(--card)}
+.lang button{background:none;border:0;padding:6px 11px;font:500 .8rem var(--sans);cursor:pointer}
+.lang button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+#prog{position:absolute;left:0;bottom:0;height:6px;width:100%;background:var(--bar);transform-origin:left;transform:scaleX(0)}
+
+/* sticky canvas stage */
+.tall{height:calc(7*85vh + 100vh)}
+.pin{position:sticky;top:calc(var(--hdr) + env(safe-area-inset-top,0px));height:calc(100vh - var(--hdr));overflow:hidden}
+@supports (height:100svh){.pin{height:calc(100svh - var(--hdr))}}
+.pin canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.sc,.hero{position:absolute;opacity:0;pointer-events:none;transition:opacity .45s,transform .45s;transform:translateY(8px)}
+.sc.on,.hero.on{opacity:1;pointer-events:auto;transform:none}
+.sc{left:clamp(16px,3vw,36px);width:min(330px,34vw);background:var(--card);border:1px solid var(--cardline);border-radius:8px;box-shadow:0 8px 28px rgba(60,50,30,.12);padding:18px 20px 20px}
+.sc[data-pos="top"]{top:9%}.sc[data-pos="mid"]{top:34%}.sc[data-pos="bot"]{bottom:12%}
+.sc h3{font:600 .88rem/1.3 var(--sans);margin:0 0 10px;letter-spacing:.005em}
+.sc p{font-size:1.02rem;line-height:1.55}
+.sc p+p{margin-top:8px;color:var(--mute);font-size:.94rem}
+.hero{right:clamp(16px,6vw,96px);top:50%;width:min(380px,36vw);transform:translateY(-50%)}
+.hero.on{transform:translateY(-50%)}
+.hero h1{font:400 clamp(1.7rem,2.6vw,2.3rem)/1.18 var(--serif);margin:0 0 20px;text-wrap:balance}
+.hero p{margin-bottom:16px;font-size:1.04rem;color:var(--ink)}
+.hero .src{font-size:.82rem;color:var(--mute);line-height:1.5}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0 22px}
+.legend{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:6px 18px;flex-wrap:wrap;justify-content:center;width:max-content;max-width:calc(100% - 32px);padding:8px 16px;background:var(--card);border:1px solid var(--cardline);border-radius:8px;font:400 .76rem var(--sans);color:var(--mute);opacity:0;transition:opacity .4s;pointer-events:none}
+.legend.on{opacity:1}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:13px;height:13px;border-radius:1.5px;display:inline-block;background:var(--sw);box-shadow:inset 0 -4px 0 rgba(255,255,255,.22)}
+[data-k="sky"]{--sw:var(--c-sky)}[data-k="violet"]{--sw:var(--c-violet)}[data-k="amber"]{--sw:var(--c-amber)}[data-k="coral"]{--sw:var(--c-coral)}[data-k="teal"]{--sw:var(--c-teal)}[data-k="oat"]{--sw:var(--c-oat)}[data-k="green"]{--sw:var(--c-green)}
+
+/* article sections */
+.col{max-width:660px;margin-inline:auto;padding-inline:20px}
+.wide{max-width:900px;margin-inline:auto;padding-inline:20px}
+.sec{padding-block:clamp(56px,9vw,120px) 0}
+.kick{font:400 1.12rem/1.3 var(--serif);color:var(--mute)}
+.sec h2{font:500 clamp(1.5rem,2.6vw,1.9rem)/1.28 var(--serif);margin:2px 0 18px;text-wrap:balance}
+.sec .lead{color:var(--mute);margin-bottom:28px}
+.panel{background:var(--card);border:1px solid var(--cardline);border-radius:6px}
+.trow{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:18px;padding:16px 20px;border-bottom:1px solid var(--cardline);align-items:start}
+.trow:last-of-type{border-bottom:0}
+.trow p{font-size:1.12rem;line-height:1.45}
+.pick{display:flex;gap:10px;align-items:center}
+.pick .sw{flex:none;opacity:.25}
+.pick .sw.set{opacity:1}
+.pick select{flex:1;min-width:0;padding:8px 10px;border:1px solid var(--cardline);background:var(--paper);border-radius:5px;font:400 .88rem var(--sans)}
+.why{grid-column:1/-1;font-size:.92rem;color:var(--mute);display:none}
+.trow.chk .why{display:block}
+.trow.ok{box-shadow:inset 3px 0 0 var(--ok)}.trow.no{box-shadow:inset 3px 0 0 var(--bad)}
+.res{font:500 .76rem var(--sans);margin-top:6px;letter-spacing:.03em}
+.ok .res{color:var(--ok)}.no .res{color:var(--bad)}
+.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:14px 20px;border-top:1px solid var(--cardline)}
+.btn{background:var(--ink);color:var(--paper);border:0;padding:9px 16px;cursor:pointer;font:500 .84rem var(--sans);border-radius:6px}
+.btn.alt{background:none;color:var(--ink);border:1px solid var(--cardline)}
+.score{font:500 .84rem var(--sans);color:var(--mute)}
+.seg{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.seg button{padding:8px 15px;border:1px solid var(--cardline);background:var(--card);cursor:pointer;font:500 .92rem var(--sans);border-radius:6px}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.big{font:400 clamp(1.4rem,3vw,1.9rem)/1.3 var(--serif);padding:24px 22px}
+.verb{background:linear-gradient(transparent 50%,color-mix(in srgb,var(--c-amber) 70%,transparent) 50%);padding-inline:.1em}
+.hear{margin-top:16px;display:grid;gap:4px;padding:2px 2px 0 2px}
+.hear b{font:600 .95rem var(--sans)}
+.hear span{color:var(--mute);font-size:.98rem}
+.check label{display:grid;grid-template-columns:24px minmax(0,1fr);gap:12px;padding:13px 20px;border-bottom:1px solid var(--cardline);cursor:pointer;align-items:start}
+.check label:last-child{border-bottom:0}
+.check input{width:17px;height:17px;margin-top:5px;accent-color:var(--ink)}
+.check input:checked+span{color:var(--mute);text-decoration:line-through;text-decoration-thickness:1px}
+.count{margin-top:12px;font:500 .84rem var(--sans);color:var(--mute)}
+footer{margin-top:clamp(56px,9vw,110px);border-top:1px solid var(--line);padding-block:30px 60px;font-size:.84rem;color:var(--mute);line-height:1.6}
+
+@media (max-width:760px){
+  .tall{height:calc(7*80vh + 100vh)}
+  .sc{left:12px;right:12px;width:auto;top:auto!important;bottom:14px!important;padding:14px 16px 16px}
+  .sc p{font-size:.95rem}
+  .legend{bottom:auto;top:10px}
+  .hero{left:16px;right:16px;width:auto;top:auto;bottom:18px;transform:none}
+  .hero.on{transform:none}
+  .hero h1{font-size:1.5rem;margin-bottom:10px}
+  .hero p{font-size:.92rem;margin-bottom:8px}
+  .hero .src{display:none}
+  .btns{margin:12px 0 0}
+  .trow{grid-template-columns:1fr}
+  .brand{font-size:.84rem}
+  .pill.hide-s{display:none}
+}
+@media (prefers-reduced-motion:reduce){.sc,.hero,.legend{transition:none}}
+</style>
+
+</head>
+<body>
+<header><div class="in">
+  <span class="brand">Reverse-Engineer a Paper</span>
+  <div class="right">
+    <button class="pill hide-s" id="jump" data-zh="去做练习 ↓">Try the exercises ↓</button>
+    <div class="lang" role="group" aria-label="Language"><button id="l-en" aria-pressed="true">EN</button><button id="l-zh" aria-pressed="false">中文</button></div>
+  </div>
+</div><div id="prog"></div></header>
+
+<main>
+<section class="tall" id="tall"><div class="pin" id="pin">
+  <canvas id="bg" aria-hidden="true"></canvas>
+  <canvas id="cv" role="img" aria-label="Squares that stand for the sentences of a paper, rearranging as you scroll"></canvas>
+
+  <div class="hero on" data-s="0">
+    <h1 data-zh="论文是包裹着数据的一个故事。">A paper is a story wrapped around data.</h1>
+    <p data-zh="我们常把论文当作信息的容器。其实读者需要被一句一句带着走：每句话都该有一个读者看得出来的功能。">We tend to treat a paper as a container for information. Readers need to be led, sentence by sentence, and every sentence should have a job the reader can see.</p>
+    <p data-zh="往下滚动，把一篇论文拆开看，再用几个小练习试一试。">Scroll to take one apart, then try a few small exercises.</p>
+    <div class="btns"><button class="pill" id="jump2" data-zh="去做练习 ↓">Jump to exercises ↓</button></div>
+    <p class="src" data-zh="独立制作的讲解，文字原创，灵感来自 Hilary Glasman-Deal《Science Research Writing》第2版的“逆向工程”写作法，并非该书的复刻。">An independent explainer in original wording, inspired by the reverse-engineering approach in Hilary Glasman-Deal's Science Research Writing (2nd ed.). Not a reproduction of the book.</p>
+  </div>
+
+  <div class="sc" data-s="1" data-pos="mid"><h3 data-zh="论文由句子构成">A paper is made of sentences</h3>
+    <p data-zh="你读过的每篇文章，都是按固定顺序排下去的一长串句子。这里的每个方块代表一句话。">Every article you have read is a long run of sentences in a set order. Each square here stands for one.</p>
+    <p data-zh="示意图，非真实数据。">Illustration, not real data.</p></div>
+  <div class="sc" data-s="2" data-pos="top"><h3 data-zh="每个部分各有职责">Each part has a job</h3>
+    <p data-zh="从上往下，颜色依次是引言、方法、结果、讨论、结论。读者预期这个顺序，所以顺序本身就在传递信息。">From top to bottom: introduction, methods, results, discussion, conclusion. Readers expect this order, so the order itself carries meaning.</p></div>
+  <div class="sc" data-s="3" data-pos="bot"><h3 data-zh="拿一篇引言放大看">Zoom in on one introduction</h3>
+    <p data-zh="这是一段虚构引言里的六句话。每一句承担不同的功能，读者能感觉到它们在把自己一步步带向作者做的事。">Six sentences from an invented introduction. Each does a different job, and together they walk the reader toward what the author did.</p></div>
+  <div class="sc" data-s="4" data-pos="top"><h3 data-zh="论文是有形状的">A paper has a shape</h3>
+    <p data-zh="引言由宽到窄，收到一个研究空白。结果是最窄处。讨论再向外打开。标题和摘要在最上面，作为整篇的预览。">An introduction narrows from a wide context to one gap. Results are the narrowest point. The discussion opens back out. Title and abstract sit on top as a preview.</p></div>
+  <div class="sc" data-s="5" data-pos="top"><h3 data-zh="学方法，而不是抄文字">Copy the method, not the text</h3>
+    <p data-zh="建模：画出好论文每句话的功能地图。挖词：收集承担各功能的词句。掌握：弄清影响理解的语法选择，比如时态。更新：期刊的写法会变，所以要持续重新采样。">Model: map the job of each sentence in a good paper. Mine: collect the phrases that do each job. Master: the grammar choices that change meaning, such as tense. Update: journals change, so keep resampling.</p></div>
+  <div class="sc" data-s="6" data-pos="mid"><h3 data-zh="轮到你的论文了">Now your own paper</h3>
+    <p data-zh="从目标期刊挑五篇近期论文，给其中一节的每句话标上功能，把承担各功能的词句抄进自己的清单。下面有三个练习帮你上手。">Pick five recent papers from your target journal. Label every sentence of one section with its job. Copy the phrases that do each job into your own list. Three exercises below get you started.</p></div>
+
+  <div class="legend" data-s="1"><span><i class="sw" data-k="oat"></i><b style="font-weight:400" data-zh="一个方块 = 一句话">one square = one sentence</b></span></div>
+  <div class="legend" data-s="2">
+    <span><i class="sw" data-k="sky"></i><b style="font-weight:400" data-zh="引言">Introduction</b></span>
+    <span><i class="sw" data-k="oat"></i><b style="font-weight:400" data-zh="方法">Methods</b></span>
+    <span><i class="sw" data-k="green"></i><b style="font-weight:400" data-zh="结果">Results</b></span>
+    <span><i class="sw" data-k="violet"></i><b style="font-weight:400" data-zh="讨论">Discussion</b></span>
+    <span><i class="sw" data-k="amber"></i><b style="font-weight:400" data-zh="结论">Conclusion</b></span></div>
+  <div class="legend" data-s="3">
+    <span><i class="sw" data-k="sky"></i><b style="font-weight:400" data-zh="背景">Background</b></span>
+    <span><i class="sw" data-k="violet"></i><b style="font-weight:400" data-zh="问题">Problem</b></span>
+    <span><i class="sw" data-k="amber"></i><b style="font-weight:400" data-zh="研究空白">Gap</b></span>
+    <span><i class="sw" data-k="coral"></i><b style="font-weight:400" data-zh="目的">Aim</b></span>
+    <span><i class="sw" data-k="teal"></i><b style="font-weight:400" data-zh="价值">Value</b></span>
+    <span><i class="sw" data-k="oat"></i><b style="font-weight:400" data-zh="文章结构">Roadmap</b></span></div>
+</div></section>
+
+<section class="sec" id="ex"><div class="wide">
+  <div class="kick" data-zh="练习一：句子的功能">Exercise 1: Sentence jobs</div>
+  <h2 data-zh="引言里的每一句话，都只做一件事。">Each sentence in an introduction does one job.</h2>
+  <p class="lead" data-zh="下面是一段虚构的引言，仅作练习。为每句话选一个功能，再点“检查”。第一句已经标好。">Below is an invented introduction, for practice only. Pick a job for each sentence, then check. The first one is done for you.</p>
+  <div class="panel"><div id="rows"></div>
+    <div class="tools"><button class="btn" id="check" data-zh="检查">Check</button><button class="btn alt" id="reset" data-zh="重来">Reset</button><span class="score" id="score"></span></div></div>
+</div></section>
+
+<section class="sec"><div class="col">
+  <div class="kick" data-zh="练习二：时态">Exercise 2: Tense</div>
+  <h2 data-zh="一个动词，决定论断听起来有多确定。">One verb decides how sure a claim sounds.</h2>
+  <p class="lead" data-zh="选一种形式，看读者会怎样理解同一句话。（演示针对英语时态。）">Pick a form and see how a reader takes the same sentence. (This demo is about English tense.)</p>
+  <div class="seg" id="seg" role="group" aria-label="Verb form"></div>
+  <div class="panel"><p class="big" id="tsent"></p></div>
+  <div class="hear"><b id="thear"></b><span id="tnote"></span></div>
+</div></section>
+
+<section class="sec"><div class="col">
+  <div class="kick" data-zh="练习三：你的草稿">Exercise 3: Your draft</div>
+  <h2 data-zh="拿这八个问题问你自己的草稿。">Eight questions to ask of your own draft.</h2>
+  <p class="lead" data-zh="勾选你已经做到的。没勾上的，就是下一轮修改的清单。">Tick what you already do. What is left is your next round of edits.</p>
+  <div class="panel check" id="check-list"></div>
+  <div class="count" id="count"></div>
+</div></section>
+</main>
+
+<footer><div class="col">
+  <p data-zh="本页为独立制作的互动讲解，所有文字与示例均为原创，示例引言是为演示而虚构的。方法灵感来自 Hilary Glasman-Deal，《Science Research Writing for Native and Non-native Speakers of English》第2版，World Scientific，2020。完整的写作模型、词汇清单和练习请阅读原书。">An independent interactive explainer. All wording and examples are original, and the sample introduction is invented for the demo. Method inspired by Hilary Glasman-Deal, Science Research Writing for Native and Non-native Speakers of English, 2nd ed., World Scientific, 2020. Read the book for its full writing models, language lists and exercises.</p>
+</div></footer>
+
+<script>
+(function(){
+var $=function(s){return document.querySelector(s)},$$=function(s){return [].slice.call(document.querySelectorAll(s))};
+var lang='en';
+try{var sv=localStorage.getItem('rp-lang');if(sv)lang=sv;else if((navigator.language||'').toLowerCase().indexOf('zh')===0)lang='zh';}catch(e){}
+function L(o){return lang==='zh'?o.zh:o.en}
+var REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- theme + palette ---------- */
+var PAL={light:{sky:'#82b2e6',violet:'#ac9fe4',amber:'#f2b45e',coral:'#ee928a',teal:'#52b09c',oat:'#dcd5c2',green:'#55a883',paper:'#f9f7f1'},
+         dark:{sky:'#5b8fcf',violet:'#8979cf',amber:'#d89b3f',coral:'#d4706a',teal:'#3c9784',oat:'#4b473c',green:'#3b8c6a',paper:'#14130f'}};
+function isDark(){var d=document.documentElement.getAttribute('data-theme');return d==='dark'||(d!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches)}
+var pal=PAL.light,SPR={};
+function mixc(a,b,t){var pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16);function ch(s){return Math.round((pa>>s&255)*(1-t)+(pb>>s&255)*t)}return 'rgb('+ch(16)+','+ch(8)+','+ch(0)+')'}
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+/* a hand-painted looking square */
+function sprite(hex,paper,seed){
+ var S=128,c=document.createElement('canvas');c.width=c.height=S;var x=c.getContext('2d'),r=rng(seed),m=7,n=9,pts=[],i,t;
+ for(i=0;i<n;i++){t=i/n;pts.push([m+(S-2*m)*t+(r()-.5)*2,m+(r()-.5)*5])}
+ for(i=0;i<n;i++){t=i/n;pts.push([S-m+(r()-.5)*5,m+(S-2*m)*t+(r()-.5)*2])}
+ for(i=0;i<n;i++){t=i/n;pts.push([S-m-(S-2*m)*t+(r()-.5)*2,S-m+(r()-.5)*5])}
+ for(i=0;i<n;i++){t=i/n;pts.push([m+(r()-.5)*5,S-m-(S-2*m)*t+(r()-.5)*2])}
+ x.beginPath();pts.forEach(function(p,k){k?x.lineTo(p[0],p[1]):x.moveTo(p[0],p[1])});x.closePath();
+ var g=x.createLinearGradient(0,0,0,S);g.addColorStop(0,hex);g.addColorStop(.55,mixc(hex,paper,.12));g.addColorStop(1,mixc(hex,paper,.4));
+ x.fillStyle=g;x.fill();x.save();x.clip();
+ for(i=0;i<70;i++){x.fillStyle=r()<.5?'rgba(255,255,255,.12)':'rgba(40,30,10,.05)';x.fillRect(r()*S,r()*S,10+r()*55,1+r()*2.4)}
+ for(i=0;i<520;i++){x.fillStyle=r()<.5?'rgba(255,255,255,.10)':'rgba(40,30,10,.07)';x.fillRect(r()*S,r()*S,1,1)}
+ x.restore();
+ x.globalAlpha=.3;x.strokeStyle=mixc(hex,'#000000',.3);x.lineWidth=2.4;x.stroke();
+ return c}
+function buildSprites(){
+ pal=isDark()?PAL.dark:PAL.light;SPR={};
+ ['sky','violet','amber','coral','teal','oat','green'].forEach(function(k){SPR[k]=[0,1,2,3].map(function(v){return sprite(pal[k],pal.paper,k.length*31+v*97+7)})});
+}
+
+/* ---------- canvas setup ---------- */
+var pin=$('#pin'),cv=$('#cv'),bg=$('#bg'),ctx=cv.getContext('2d'),bctx=bg.getContext('2d');
+var W=0,H=0,DPR=1,cell=40,cols=0,rows=0,gx=0,gy=0,N=0,mobile=false,cells=[],T=[],LB=[],cur=0;
+
+function home(i){return {x:gx+(i%cols)*cell+cell/2,y:gy+Math.floor(i/cols)*cell+cell/2}}
+function hid(i){var h=home(i);return {x:h.x,y:h.y,s:cell*.5,a:0,c:'oat'}}
+function pick(R,list){var t=R(),a=0;for(var i=0;i<list.length;i++){a+=list[i][1];if(t<a)return list[i][0]}return list[0][0]}
+function alloc(count,off){var st=Math.max(1,Math.floor(N/count)),out=[];for(var k=0;k<count;k++)out.push((k*st+(off||0))%N);return out}
+
+function drawBg(){
+ bg.width=W*DPR;bg.height=H*DPR;bctx.setTransform(DPR,0,0,DPR,0,0);bctx.clearRect(0,0,W,H);
+ var R=rng(11),dk=isDark(),i,y,x;
+ for(i=0;i<=cols+1;i++){x=gx+i*cell;bctx.strokeStyle=dk?'rgba(255,250,230,'+(i%4?.05:.10)+')':'rgba(80,66,40,'+(i%4?.09:.17)+')';bctx.lineWidth=i%4?.6:1;bctx.beginPath();bctx.moveTo(x,0);for(y=0;y<=H+60;y+=60)bctx.lineTo(x+(R()-.5)*1.4,y);bctx.stroke()}
+ for(i=0;i<=rows+1;i++){y=gy+i*cell;bctx.strokeStyle=dk?'rgba(255,250,230,'+(i%4?.05:.10)+')':'rgba(80,66,40,'+(i%4?.09:.17)+')';bctx.lineWidth=i%4?.6:1;bctx.beginPath();bctx.moveTo(0,y);for(x=0;x<=W+60;x+=60)bctx.lineTo(x,y+(R()-.5)*1.4);bctx.stroke()}
+}
+
+var CAP=[
+ {n:{en:'Background',zh:'背景'},t:{en:'Drones go daily',zh:'无人机进入日常'}},
+ {n:{en:'Problem',zh:'问题'},t:{en:'Queues form at the pads',zh:'起降点先排队'}},
+ {n:{en:'Gap',zh:'研究空白'},t:{en:'Few study the pads',zh:'鲜有人研究起降点'}},
+ {n:{en:'Aim',zh:'目的'},t:{en:'We forecast queue length',zh:'本文预测排队长度'}},
+ {n:{en:'Value',zh:'价值'},t:{en:'Dispatch can be staggered',zh:'可以错峰派单'}},
+ {n:{en:'Roadmap',zh:'文章结构'},t:{en:'Where each section goes',zh:'各节内容安排'}}];
+var HG=[
+ {k:'title',c:'coral',rows:[3],n:{en:'Title',zh:'标题'}},
+ {k:'abstract',c:'teal',rows:[5],n:{en:'Abstract',zh:'摘要'}},
+ {k:'intro',c:'sky',rows:[11,9,7],n:{en:'Introduction',zh:'引言'}},
+ {k:'methods',c:'oat',rows:[5,4],n:{en:'Methods',zh:'方法'}},
+ {k:'results',c:'green',rows:[3,2],n:{en:'Results',zh:'结果'}},
+ {k:'disc',c:'violet',rows:[4,6,8],n:{en:'Discussion',zh:'讨论'}},
+ {k:'concl',c:'amber',rows:[10],n:{en:'Conclusion',zh:'结论'}}];
+var LOOP=[{k:'sky',n:{en:'1 MODEL',zh:'1 建模'}},{k:'violet',n:{en:'2 MINE',zh:'2 挖词'}},{k:'coral',n:{en:'3 MASTER',zh:'3 掌握'}},{k:'green',n:{en:'4 UPDATE',zh:'4 更新'}}];
+
+function build(){
+ var i,R,t,h,col,row,L0=[];T=[];LB=[];
+ // S0 scattered, left side
+ R=rng(5);t=[];
+ for(i=0;i<N;i++){h=home(i);col=i%cols;row=Math.floor(i/cols);var inreg=mobile?row<rows*.42:col<cols*.56;
+  t.push(inreg&&R()<.4?{x:h.x,y:h.y,s:cell*.84,a:1,c:pick(R,[['oat',.3],['sky',.2],['violet',.2],['amber',.1],['green',.2]])}:hid(i))}
+ T[0]=t;LB[0]=[];
+ // S1 full sheet of sentences
+ R=rng(9);t=[];
+ for(i=0;i<N;i++){h=home(i);t.push(R()<.9?{x:h.x,y:h.y,s:cell*.86,a:1,c:'oat'}:hid(i))}
+ T[1]=t;LB[1]=[];
+ // S2 paper order, by section
+ R=rng(13);t=[];
+ for(i=0;i<N;i++){h=home(i);col=i%cols;row=Math.floor(i/cols);var p=(row+col/cols)/rows+(R()-.5)*.07,c=p<.17?'sky':p<.40?'oat':p<.68?'green':p<.88?'violet':'amber';
+  t.push(R()<.94?{x:h.x,y:h.y,s:cell*.86,a:1,c:c}:hid(i))}
+ T[2]=t;LB[2]=[];
+ // S3 six sentences
+ t=[];for(i=0;i<N;i++)t.push(hid(i));
+ var idx=alloc(6,3),c3=mobile?2:3,r3=Math.ceil(6/c3),big=mobile?Math.min(cell*1.5,62):Math.min(cell*2.2,86),spx=mobile?W*.42:Math.min(200,W*.15),spy=mobile?big*2.05:big*2.1,
+     cx=mobile?W/2:W*.62,cy=mobile?H*.3:H*.46,order=['sky','violet','amber','coral','teal','oat'],lb=[];
+ idx.forEach(function(ci,k){var cc=k%c3,rr=Math.floor(k/c3),x=cx+(cc-(c3-1)/2)*spx,y=cy+(rr-(r3-1)/2)*spy;
+  t[ci]={x:x,y:y,s:big,a:1,c:order[k]};
+  lb.push({text:CAP[k].n,x:x,y:y+big/2+16,size:10.5,w:600,col:'ink',up:true,maxw:spx*.9});
+  lb.push({text:CAP[k].t,x:x,y:y+big/2+31,size:12.5,w:400,col:'mute',maxw:spx*.9})});
+ T[3]=t;LB[3]=lb;
+ // S4 hourglass
+ t=[];for(i=0;i<N;i++)t.push(hid(i));
+ var total=0,nr=0;HG.forEach(function(g){g.rows.forEach(function(n){total+=n;nr++})});
+ var idx4=alloc(total,1),hs=Math.min(cell*1.05,H*.74/(nr*1.08),(mobile?W*.6:W*.4)/11),hcx=mobile?W*.36:W*.56,y0=(mobile?H*.32:H*.5)-nr*hs*1.08/2+hs/2,ptr=0,rowi=0;lb=[];
+ HG.forEach(function(g){var yy0=y0+rowi*hs*1.08;
+  g.rows.forEach(function(n){var y=y0+rowi*hs*1.08;for(var k=0;k<n;k++){t[idx4[ptr++]]={x:hcx+(k-(n-1)/2)*hs*1.05,y:y,s:hs,a:1,c:g.c}}rowi++});
+  var yy1=y0+(rowi-1)*hs*1.08;lb.push({text:g.n,x:hcx+5.5*hs+16,y:(yy0+yy1)/2+4,size:11,w:600,col:'ink',up:true,left:true})});
+ T[4]=t;LB[4]=lb;
+ // S5 loop ring
+ t=[];for(i=0;i<N;i++)t.push(hid(i));
+ var ring=40,idx5=alloc(ring,2),rcx=mobile?W/2:W*.6,rcy=mobile?H*.34:H*.5,RR=Math.min(W,H)*(mobile?.24:.29),rs=2*Math.PI*RR/ring*.92;lb=[];
+ idx5.forEach(function(ci,k){var ang=-90+k*360/ring+4.5,q=Math.floor(((ang+90+360)%360)/90),rad=ang*Math.PI/180;
+  t[ci]={x:rcx+RR*Math.cos(rad),y:rcy+RR*Math.sin(rad),s:rs,a:1,c:LOOP[q].k}});
+ [-45,45,135,225].forEach(function(a,q){var rad=a*Math.PI/180,x=rcx+(RR+rs+10)*Math.cos(rad),y=rcy+(RR+rs+10)*Math.sin(rad);
+  lb.push({text:LOOP[q].n,x:x,y:y+4,size:11,w:600,col:'ink',up:false,left:Math.cos(rad)>0,right:Math.cos(rad)<0})});
+ T[5]=t;LB[5]=lb;
+ // S6 back to the sheet
+ R=rng(21);t=[];
+ for(i=0;i<N;i++){h=home(i);col=i%cols;row=Math.floor(i/cols);inreg=mobile?row<rows*.45:col<cols*.56;
+  t.push(inreg&&R()<.5?{x:h.x,y:h.y,s:cell*.84,a:1,c:pick(R,[['sky',.2],['violet',.15],['amber',.15],['coral',.15],['teal',.15],['green',.2]])}:hid(i))}
+ T[6]=t;LB[6]=[];
+}
+
+function layout(){
+ DPR=Math.min(2,window.devicePixelRatio||1);W=pin.clientWidth;H=pin.clientHeight;if(!W||!H)return;
+ mobile=W<760;cell=mobile?Math.floor(W/11):Math.max(26,Math.min(46,Math.round(W/32)));
+ cols=Math.floor(W/cell);rows=Math.floor(H/cell);gx=(W-cols*cell)/2;gy=(H-rows*cell)/2;N=cols*rows;
+ cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);
+ var R=rng(3);
+ while(cells.length<N){var r=R();cells.push({x:0,y:0,s:0,a:0,rot:(R()-.5)*.07,v:Math.floor(R()*4),c0:'oat',c1:'oat',mix:1,k:.05+r*.07,_i:cells.length})}
+ cells.length=N;
+ cells.forEach(function(c,i){if(!c.init){var h=home(i);c.x=h.x;c.y=h.y;c.s=cell*.5;c.init=1}});
+ build();drawBg();retarget(true);
+}
+
+function retarget(){
+ var tg=T[cur];if(!tg)return;
+ cells.forEach(function(c,i){var g=tg[i];if(g.c!==c.c1){c.c0=c.c1;c.c1=g.c;c.mix=(g.a===0||c.a<.05)?1:0}});
+}
+var labA=[];for(var q=0;q<7;q++)labA.push(0);
+
+function wrap(text,maxw){
+ if(!maxw)return [text];var out=[],line='',parts=lang==='zh'?text.split(''):text.split(' '),sep=lang==='zh'?'':' ';
+ parts.forEach(function(w){var test=line?line+sep+w:w;if(ctx.measureText(test).width>maxw&&line){out.push(line);line=w}else line=test});if(line)out.push(line);return out}
+
+function frame(){
+ requestAnimationFrame(frame);if(!visible||!T[cur])return;
+ var tg=T[cur],i,c,g,k;
+ ctx.clearRect(0,0,W,H);
+ for(i=0;i<cells.length;i++){c=cells[i];g=tg[i];k=REDUCED?1:c.k;
+  c.x+=(g.x-c.x)*k;c.y+=(g.y-c.y)*k;c.s+=(g.s-c.s)*k;c.a+=(g.a-c.a)*(REDUCED?1:.09);if(c.mix<1)c.mix=Math.min(1,c.mix+(REDUCED?1:.06));
+  if(c.a<.01)continue;
+  ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.rot);
+  if(c.mix<1){ctx.globalAlpha=c.a*(1-c.mix);ctx.drawImage(SPR[c.c0][c.v],-c.s/2,-c.s/2,c.s,c.s);ctx.globalAlpha=c.a*c.mix}else ctx.globalAlpha=c.a;
+  ctx.drawImage(SPR[c.c1][c.v],-c.s/2,-c.s/2,c.s,c.s);ctx.restore()}
+ // labels
+ var dk=isDark(),inkc=dk?'#ece8dc':'#1d1c19',mutec=dk?'#a8a397':'#6f6b61';
+ for(var s=0;s<7;s++){labA[s]+=((s===cur?1:0)-labA[s])*(REDUCED?1:.12);if(labA[s]<.02||!LB[s])continue;
+  LB[s].forEach(function(l){var font=(l.w||400)+' '+l.size+'px '+getComputedStyle(document.documentElement).getPropertyValue('--sans');ctx.font=font;
+   var txt=L(l.text);if(l.up&&lang!=='zh')txt=txt.toUpperCase();ctx.letterSpacing=l.up&&lang!=='zh'?'1px':'0px';
+   ctx.globalAlpha=labA[s];ctx.fillStyle=l.col==='ink'?inkc:mutec;ctx.textAlign=l.left?'left':l.right?'right':'center';
+   var lines=wrap(txt,l.maxw);lines.forEach(function(ln,j){ctx.fillText(ln,l.x,l.y+j*(l.size+4))});ctx.globalAlpha=1;ctx.letterSpacing='0px'})}
+}
+
+/* ---------- scroll scenes ---------- */
+var tall=$('#tall'),HDR=52,visible=true,tick=false;
+function setScene(n){if(n===cur&&T[cur]&&cells.length)return;cur=n;retarget();
+ $$('.sc,.hero').forEach(function(e){e.classList.toggle('on',+e.dataset.s===n)});
+ $$('.legend').forEach(function(e){e.classList.toggle('on',+e.dataset.s===n)})}
+function onScroll(){if(tick)return;tick=true;requestAnimationFrame(function(){tick=false;
+ var total=tall.offsetHeight-pin.offsetHeight,top=tall.getBoundingClientRect().top-HDR,p=Math.min(1,Math.max(0,-top/total)),n=Math.min(6,Math.floor(p*7));
+ setScene(n);var h=document.documentElement.scrollHeight-innerHeight;$('#prog').style.transform='scaleX('+(h>0?Math.min(1,scrollY/h):0)+')'})}
+new IntersectionObserver(function(e){visible=e[0].isIntersecting},{rootMargin:'100px'}).observe(tall);
+addEventListener('scroll',onScroll,{passive:true});
+addEventListener('resize',function(){layout();onScroll()});
+function toEx(){$('#ex').scrollIntoView({behavior:REDUCED?'auto':'smooth'})}
+$('#jump').onclick=toEx;$('#jump2').onclick=toEx;
+
+/* ---------- exercises ---------- */
+var FN={bg:{en:'Background',zh:'背景',k:'sky'},prob:{en:'Problem',zh:'问题',k:'violet'},gap:{en:'Gap',zh:'研究空白',k:'amber'},aim:{en:'Aim',zh:'目的',k:'coral'},value:{en:'Value',zh:'价值',k:'teal'},road:{en:'Roadmap',zh:'文章结构',k:'oat'}};
+var SENT=[
+ {en:'Low-altitude delivery drones are moving from pilot schemes to daily operations in several large cities.',zh:'在多个大城市，低空配送无人机正从试点走向日常运营。',a:'bg',why:{en:'Opens wide with a broad topic that everyone in the field already accepts.',zh:'从宽处开篇：领域内每个人都认可的大背景。'}},
+ {en:'As volumes grow, take-off and landing points are where queues form first.',zh:'随着业务量增长，起降点最先出现排队。',a:'prob',why:{en:'Narrows to a specific problem and shows why it matters.',zh:'收窄到一个具体问题，并说明它为什么重要。'}},
+ {en:'Existing forecasting work focuses on air corridors, and few studies look at landing points themselves.',zh:'现有预测研究多聚焦空中走廊，很少研究起降点本身。',a:'gap',why:{en:'Names what earlier work has not done.',zh:'指出前人没有做到的事。'}},
+ {en:'Here we predict queue length at landing points from arrival records collected over twelve weeks.',zh:'本文基于十二周的到达记录预测起降点的排队长度。',a:'aim',why:{en:'States what this paper does.',zh:'说明本文做了什么。'}},
+ {en:'Forecasts at this level would let operators stagger dispatch before a queue builds.',zh:'这一层面的预测可让运营方在排队形成前错峰派单。',a:'value',why:{en:'Says who benefits and how.',zh:'说明谁会受益、怎样受益。'}},
+ {en:'Section 2 reviews related work and Section 3 describes the data.',zh:'第2节回顾相关研究，第3节介绍数据。',a:'road',why:{en:'Tells the reader how the paper is organised.',zh:'告诉读者全文如何组织。'}}];
+var picks=[SENT[0].a,'','','','',''],checked=false;
+var TENSES=[
+ {v:'formed',hear:{en:'Reader hears: this is what the study found.',zh:'读者听到的是：这是本研究的发现。'},note:{en:'Past tense reports an event. The reader sees your result and judges the evidence.',zh:'过去时在报告一件发生过的事。读者看到的是你的结果，并据此评判证据。'}},
+ {v:'form',hear:{en:'Reader hears: everyone already knows this.',zh:'读者听到的是：这是人人都知道的事。'},note:{en:'Present tense reads as an established fact. If it is your one new result, it overclaims.',zh:'现在时读起来像公认事实。如果它只是你的一个新结果，就说过头了。'}},
+ {v:'may form',hear:{en:'Reader hears: this is a possibility.',zh:'读者听到的是：这只是一种可能。'},note:{en:'A modal verb signals a hypothesis. Right when the data point that way but do not settle it.',zh:'情态动词表示推测。数据倾向于此但不足以定论时，这样写才恰当。'}}];
+var tIdx=0;
+var CHECK=[
+ {en:'I know which genre I am writing and have a recent model of it.',zh:'我清楚自己在写哪种文体，并且手上有一篇近期范文。'},
+ {en:'I have checked what a reader outside my sub-field can be assumed to know.',zh:'我想过子领域之外的读者大概知道什么。'},
+ {en:'Every figure and table has a reason to sit where it sits.',zh:'每张图表放在那里都有理由。'},
+ {en:'Each paragraph has a job I can name in a few words.',zh:'每一段的功能，我都能用几个词说出来。'},
+ {en:'Each sentence fits its paragraph and follows from the one before.',zh:'每句话都契合所在段落，并且自然承接上一句。'},
+ {en:'Where a reader might ask “so what?”, I have said what the data show.',zh:'读者可能问“所以呢”的地方，我已说明数据意味着什么。'},
+ {en:'My verb tenses match the status of each claim.',zh:'我的动词时态与每个论断的地位相符。'},
+ {en:'My title predicts the content, and subheadings summarise their sections.',zh:'标题能预示内容，小标题能概括各节。'}];
+
+function buildRows(){var box=$('#rows');box.innerHTML='';
+ SENT.forEach(function(s,i){var r=document.createElement('div');r.className='trow'+(checked?' chk '+(picks[i]===s.a?'ok':'no'):'');
+  var p=document.createElement('p');p.textContent=L(s);
+  var c=document.createElement('div'),pk=document.createElement('div');pk.className='pick';
+  var sw=document.createElement('i');sw.className='sw'+(picks[i]?' set':'');if(picks[i])sw.setAttribute('data-k',FN[picks[i]].k);
+  var sel=document.createElement('select');sel.id='pick'+i;sel.setAttribute('aria-label','Sentence '+(i+1));
+  var o=document.createElement('option');o.value='';o.textContent=L({en:'Choose a job…',zh:'选择功能…'});sel.appendChild(o);
+  Object.keys(FN).forEach(function(k){var op=document.createElement('option');op.value=k;op.textContent=L(FN[k]);if(picks[i]===k)op.selected=true;sel.appendChild(op)});
+  sel.onchange=function(){picks[i]=sel.value;checked=false;$('#score').textContent='';buildRows()};
+  pk.appendChild(sw);pk.appendChild(sel);c.appendChild(pk);
+  if(checked){var res=document.createElement('div');res.className='res';res.textContent=picks[i]===s.a?L({en:'✓ Correct',zh:'✓ 正确'}):L({en:'✗ Answer: ',zh:'✗ 答案：'})+L(FN[s.a]);c.appendChild(res)}
+  var why=document.createElement('div');why.className='why';why.textContent=L(s.why);
+  r.appendChild(p);r.appendChild(c);r.appendChild(why);box.appendChild(r)})}
+function showScore(){var n=SENT.filter(function(s,i){return picks[i]===s.a}).length;$('#score').textContent=lang==='zh'?(n+' / '+SENT.length+' 正确'):(n+' / '+SENT.length+' correct')}
+$('#check').onclick=function(){checked=true;buildRows();showScore()};
+$('#reset').onclick=function(){picks=[SENT[0].a,'','','','',''];checked=false;$('#score').textContent='';buildRows()};
+
+function buildTense(){var seg=$('#seg');seg.innerHTML='';
+ TENSES.forEach(function(t,i){var b=document.createElement('button');b.textContent=t.v;b.setAttribute('aria-pressed',i===tIdx);b.onclick=function(){tIdx=i;buildTense()};seg.appendChild(b)});
+ var t=TENSES[tIdx],el=$('#tsent');el.innerHTML='';el.appendChild(document.createTextNode('Queues '));
+ var v=document.createElement('span');v.className='verb';v.textContent=t.v;el.appendChild(v);el.appendChild(document.createTextNode(' at landing points when arrivals exceed capacity.'));
+ $('#thear').textContent=L(t.hear);$('#tnote').textContent=L(t.note)}
+
+var done={};try{done=JSON.parse(localStorage.getItem('rp-check')||'{}')}catch(e){}
+function buildCheck(){var box=$('#check-list');box.innerHTML='';
+ CHECK.forEach(function(c,i){var l=document.createElement('label'),inp=document.createElement('input');inp.type='checkbox';inp.id='ck'+i;inp.checked=!!done[i];
+  inp.onchange=function(){done[i]=inp.checked;try{localStorage.setItem('rp-check',JSON.stringify(done))}catch(e){}count()};
+  var sp=document.createElement('span');sp.textContent=L(c);l.appendChild(inp);l.appendChild(sp);box.appendChild(l)});count()}
+function count(){var n=CHECK.filter(function(_,i){return done[i]}).length;$('#count').textContent=lang==='zh'?('已完成 '+n+' / '+CHECK.length):(n+' of '+CHECK.length+' done')}
+
+/* ---------- language + theme ---------- */
+function applyLang(){
+ document.documentElement.lang=lang==='zh'?'zh-CN':'en';
+ $$('[data-zh]').forEach(function(e){if(e.dataset.en==null)e.dataset.en=e.textContent;e.textContent=lang==='zh'?e.dataset.zh:e.dataset.en});
+ $('#l-en').setAttribute('aria-pressed',lang==='en');$('#l-zh').setAttribute('aria-pressed',lang==='zh');
+ buildRows();buildTense();buildCheck();if(checked)showScore();if(W)build()}
+function setLang(l){lang=l;try{localStorage.setItem('rp-lang',l)}catch(e){}applyLang();retarget()}
+$('#l-en').onclick=function(){setLang('en')};$('#l-zh').onclick=function(){setLang('zh')};
+function applyTheme(){buildSprites();if(W){drawBg()}}
+matchMedia('(prefers-color-scheme: dark)').addEventListener&&matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+buildSprites();applyLang();layout();setScene(0);onScroll();requestAnimationFrame(frame);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){});
+})();
+</script>
+</body>
+</html>
